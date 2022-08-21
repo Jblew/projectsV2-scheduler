@@ -41,9 +41,20 @@ runs:
     - uses: actions/github-script@v6
       env:
         ACTION_PATH: ${{ github.action_path }}
+        PROJECT: ${{ inputs.project }}
+        SCHEDULE_FIELD_NAME: ${{ inputs.schedule-field-name }}
+        STATUS_FIELD_NAME: ${{ inputs.status-field-name }}
+        SCHEDULE_STATE_NAME: ${{ inputs.schedule-state-name }}
+        TODO_STATE_NAME: ${{ inputs.todo-state-name }}
       with:
         github-token: ${{ inputs.token }}
         script: |
-          const action_path = process.env.ACTION_PATH
-          const script = require(`${action_path}/action.js`)
-          await script({github, context, core})
+          const script = require(`${process.env.ACTION_PATH}/action.js`)
+          await script({
+            github, context, core,
+            project: process.env.PROJECT,
+            scheduleFieldName: process.env.SCHEDULE_FIELD_NAME,
+            statusFieldName: process.env.STATUS_FIELD_NAME,
+            scheduleStateName: process.env.SCHEDULE_STATE_NAME,
+            todoStateName: process.env.TODO_STATE_NAME,
+          })

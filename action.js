@@ -1,5 +1,7 @@
-module.exports = async ({ github, context, core }) => {
-    const { project, statusFieldName, scheduleFieldName, scheduleStateName, todoStateName } = getInputs()
+module.exports = async ({
+    github, context, core,
+    project, statusFieldName, scheduleFieldName, scheduleStateName, todoStateName,
+}) => {
     const projectNodeID = await getProjectNodeID(project)
     const { statusFieldID, scheduleFieldID, scheduleFieldOptions } = await getFieldIDs({
         projectNodeID, scheduleFieldName, statusFieldName
@@ -7,6 +9,7 @@ module.exports = async ({ github, context, core }) => {
     const scheduleOptionID = getFieldOptionID(scheduleFieldOptions, scheduleStateName)
     const todoOptionID = getFieldOptionID(scheduleFieldOptions, todoStateName)
     console.log('Found params', {
+        project, statusFieldName, scheduleFieldName, scheduleStateName, todoStateName,
         statusFieldID,
         scheduleFieldID,
         scheduleOptionID,
@@ -14,14 +17,6 @@ module.exports = async ({ github, context, core }) => {
     })
     core.setOutput('de-scheduled-count', `${0}`);
 
-    function getInputs() {
-        const project = core.getInput('project', { required: true })
-        const statusFieldName = core.getInput('status-field-name', { required: true })
-        const scheduleFieldName = core.getInput('schedule-field-name', { required: true })
-        const scheduleStateName = core.getInput('schedule-state-name', { required: true })
-        const todoStateName = core.getInput('todo-state-name', { required: true })
-        return { project, scheduleFieldName, statusFieldName, scheduleStateName, todoStateName }
-    }
 
     async function getProjectNodeID(url) {
         const match = /^.*(?<type>orgs|users)\/(?<name>[^\/]+)\/projects\/(?<number>[0-9]+).*$/gm
