@@ -1,13 +1,13 @@
 module.exports = async ({
-    github, context, core,
+    github,
     project, statusFieldName, scheduleFieldName, scheduleStateName, todoStateName,
 }) => {
     const projectNodeID = await getProjectNodeID(project)
-    const { statusFieldID, scheduleFieldID, scheduleFieldOptions } = await getFieldIDs({
+    const { statusFieldID, scheduleFieldID, statusFieldOptions } = await getFieldIDs({
         projectNodeID, scheduleFieldName, statusFieldName
     })
-    const scheduleOptionID = getFieldOptionID(scheduleFieldOptions, scheduleStateName)
-    const todoOptionID = getFieldOptionID(scheduleFieldOptions, todoStateName)
+    const scheduleOptionID = getFieldOptionID(statusFieldOptions, scheduleStateName)
+    const todoOptionID = getFieldOptionID(statusFieldOptions, todoStateName)
     console.log('Found params', {
         project, statusFieldName, scheduleFieldName, scheduleStateName, todoStateName,
         statusFieldID,
@@ -15,7 +15,6 @@ module.exports = async ({
         scheduleOptionID,
         todoOptionID
     })
-    core.setOutput('de-scheduled-count', `${0}`);
 
 
     async function getProjectNodeID(url) {
@@ -82,18 +81,18 @@ module.exports = async ({
             }
         }
         `
-        const data = callGraphQL({ query })
-        console.log(data)
+        const data = await callGraphQL({ query })
         const statusFieldID = data.node.statusField.id
         const scheduleFieldID = data.node.scheduleField.id
-        const scheduleFieldOptions = data.node.scheduleField.options
-        return { statusFieldID, scheduleFieldID, scheduleFieldOptions }
+        const statusFieldOptions = data.node.statusField.options
+        return { statusFieldID, scheduleFieldID, statusFieldOptions }
     }
 
-    function getFieldOptionID(name, options) {
+    function getFieldOptionID(options, name) {
+        console.log(options)
         const foundOptions = options.filter(option => option.name.toLowerCase() === name.toLowerCase())
         if (foundOptions.length === 0) {
-            throw new Error(`So such field option: ${name}. Available options are: ${options.map(o => o.name.join(", "))}`)
+            throw new Error(`So such field option: ${name}. Available options are: ${options.map(o => o.name).join(", ")}`)
         }
         return foundOptions[0].id
     }
