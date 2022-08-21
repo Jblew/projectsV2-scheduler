@@ -1,0 +1,21 @@
+name: 'ProjectsV2 scheduler'
+description: 'Schedules items in Projects V2 based on Schedule field.'
+inputs:
+  token:
+    description: 'Github Personal AccessToken (PAT) with full project scope.'
+    required: false
+
+  schedule-state-name:
+    description: 'Schedule state name. Project V2 needs to have '
+    required: false
+    default: 'Schedule'
+
+  schedule-field-name:
+    description: 'Name of a TEXT field that stores the scheduled date.'
+    required: false
+    default: 'Schedule'
+outputs: []
+runs:
+  using: "composite"
+  steps:
+    - run: 
