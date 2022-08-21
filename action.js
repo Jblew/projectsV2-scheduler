@@ -1,11 +1,10 @@
 module.exports = async ({ github, context, core }) => {
-    const { project, scheduleStateName, scheduleFieldName } = getInputs()
+    const { project, statusFieldName, scheduleFieldName, scheduleStateName, todoStateName } = getInputs()
     const projectNodeID = await getProjectNodeID(project)
     const { statusFieldID, scheduleFieldID, scheduleFieldOptions } = await getFieldIDs({
-        projectNodeID, scheduleFieldName
+        projectNodeID, scheduleFieldName, statusFieldName
     })
     const scheduleOptionID = getFieldOptionID(scheduleFieldOptions, scheduleStateName)
-    const todoStateName = "todo"
     const todoOptionID = getFieldOptionID(scheduleFieldOptions, todoStateName)
     console.log('Found params', {
         statusFieldID,
@@ -13,15 +12,20 @@ module.exports = async ({ github, context, core }) => {
         scheduleOptionID,
         todoOptionID
     })
+    core.setOutput('de-scheduled-count', `${0}`);
 
     function getInputs() {
         const project = core.getInput('project')
         if (!project) throw new Error(`Missing input 'project'`)
-        const scheduleStateName = core.getInput('schedule-state-name')
-        if (!scheduleStateName) throw new Error(`Missing input 'schedule-state-name'`)
+        const statusFieldName = core.getInput('status-field-name')
+        if (!statusFieldName) throw new Error(`Missing input 'status-field-name'`)
         const scheduleFieldName = core.getInput('schedule-field-name')
         if (!scheduleFieldName) throw new Error(`Missing input 'schedule-field-name'`)
-        return { project, scheduleStateName, scheduleFieldName }
+        const scheduleStateName = core.getInput('schedule-state-name')
+        if (!scheduleStateName) throw new Error(`Missing input 'schedule-state-name'`)
+        const todoStateName = core.getInput('todo-state-name')
+        if (!todoStateName) throw new Error(`Missing input 'todo-state-name'`)
+        return { project, scheduleFieldName, statusFieldName, scheduleStateName, todoStateName }
     }
 
     async function getProjectNodeID(url) {
@@ -62,8 +66,7 @@ module.exports = async ({ github, context, core }) => {
         return data.user.projectV2.id
     }
 
-    async function getFieldIDs({ projectNodeID, scheduleFieldName }) {
-        const statusFieldName = "Status"
+    async function getFieldIDs({ projectNodeID, scheduleFieldName, statusFieldName }) {
         const query = `
         query FindFieldIDs {
             node(id: "${projectNodeID}") {
