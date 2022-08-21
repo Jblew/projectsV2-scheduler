@@ -9,8 +9,9 @@ module.exports = async ({
     const scheduleOptionID = getFieldOptionID(statusFieldOptions, scheduleStateName)
     const todoOptionID = getFieldOptionID(statusFieldOptions, todoStateName)
     const items = await getProjectItems({ projectNodeID, scheduleFieldName, statusFieldName })
-    // const scheduledItems = getScheduledItems({ items, scheduleFieldName })
-    console.log(items)
+    const { itemsToDeschedule, errors } = filterItems({ items, scheduleStateName })
+    console.log("TO DESCHEDULE:", itemsToDeschedule)
+    console.log("ERRORS:", errors)
 
 
     async function getProjectNodeID(url) {
@@ -101,6 +102,17 @@ module.exports = async ({
                         nodes {
                             id
                             ... on ProjectV2Item {
+                                content {
+                                    ... on DraftIssue {
+                                        title
+                                    }
+                                    ... on Issue {
+                                        title
+                                    }
+                                    ... on PullRequest {
+                                        title
+                                    }
+                                }
                                 schedule: fieldValueByName(name: "${scheduleFieldName}") {
                                     ... on ProjectV2ItemFieldTextValue {
                                         text
@@ -125,6 +137,37 @@ module.exports = async ({
         return paginateGraphQLQuery(query, (data) => data.node.items)
     }
 
+    function filterItems({ items, scheduleStateName }) {
+        const errors = []
+        const itemsToDeschedule = []
+        const scheduledItems = items.filter(item => item.status && item.status.name.toLowerCase() === scheduleStateName.toLowerCase())
+        for (const item of scheduledItems) {
+            const { deschedule, error } = shouldDescheduleItem(item)
+            if (error) {
+                errors.push(error)
+            }
+            if (deschedule) {
+                itemsToDeschedule.push(item)
+            }
+        }
+        return { itemsToDeschedule, errors }
+    }
+
+    function shouldDescheduleItem(item) {
+        const title = item.content.title
+        if (!item.schedule || !item.schedule.text) {
+            return { error: `Item ${title} does not have a schedule field` }
+        }
+        const scheduleValue = item.schedule.text
+        const datemillis = Date.parse(scheduleValue)
+        if (typeof datemillis !== "number") {
+            return { error: `Item ${title} has invalid schedule field value: ${scheduleValue}` }
+        }
+        if (datemillis < Date.now()) {
+            return { deschedule: true }
+        }
+    }
+
     async function callGraphQL(opts) {
         return github.graphql({
             ...opts,
@@ -145,7 +188,7 @@ module.exports = async ({
         while (hasNextPage) {
             const data = await callGraphQL({ query, endCursor })
             const currentItems = itemsObjectGetterFn(data)
-            items.push(currentItems.nodes)
+            items.push(...currentItems.nodes)
             endCursor = currentItems.pageInfo.endCursor
             hasNextPage = currentItems.pageInfo.hasNextPage
         }
