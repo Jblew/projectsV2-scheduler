@@ -30,8 +30,8 @@ inputs:
     default: 'Todo'
 
 outputs:
-   - de-scheduled-count:
-     description: 'The count of issues that were de-scheduled (moved back to TODO column)'
+  de-scheduled-count:
+    description: 'The count of issues that were de-scheduled (moved back to TODO column)'
 
 runs:
   using: "composite"
