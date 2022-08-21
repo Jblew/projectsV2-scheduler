@@ -8,13 +8,9 @@ module.exports = async ({
     })
     const scheduleOptionID = getFieldOptionID(statusFieldOptions, scheduleStateName)
     const todoOptionID = getFieldOptionID(statusFieldOptions, todoStateName)
-    console.log('Found params', {
-        project, statusFieldName, scheduleFieldName, scheduleStateName, todoStateName,
-        statusFieldID,
-        scheduleFieldID,
-        scheduleOptionID,
-        todoOptionID
-    })
+    const items = await getProjectItems({ projectNodeID, scheduleFieldName, statusFieldName })
+    // const scheduledItems = getScheduledItems({ items, scheduleFieldName })
+    console.log(items)
 
 
     async function getProjectNodeID(url) {
@@ -89,12 +85,44 @@ module.exports = async ({
     }
 
     function getFieldOptionID(options, name) {
-        console.log(options)
         const foundOptions = options.filter(option => option.name.toLowerCase() === name.toLowerCase())
         if (foundOptions.length === 0) {
             throw new Error(`So such field option: ${name}. Available options are: ${options.map(o => o.name).join(", ")}`)
         }
         return foundOptions[0].id
+    }
+
+    async function getProjectItems({ projectNodeID, statusFieldName, scheduleFieldName }) {
+        const query = `
+        query GetProjectItems($endCursor: String) {
+            node(id: "${projectNodeID}") {
+                ... on ProjectV2 {
+                    items(first: 100, after: $endCursor) {
+                        nodes {
+                            id
+                            ... on ProjectV2Item {
+                                schedule: fieldValueByName(name: "${scheduleFieldName}") {
+                                    ... on ProjectV2ItemFieldTextValue {
+                                        text
+                                    }
+                                }
+                                status: fieldValueByName(name: "${statusFieldName}") {
+                                    ... on ProjectV2ItemFieldSingleSelectValue {
+                                        name
+                                    }
+                                }
+                            }
+                        }
+                        pageInfo {
+                            hasNextPage
+                            endCursor
+                        }
+                    }
+                }
+            }
+        }
+        `
+        return paginateGraphQLQuery(query, (data) => data.node.items)
     }
 
     async function callGraphQL(opts) {
@@ -104,5 +132,23 @@ module.exports = async ({
                 accept: 'application/vnd.github.v3.raw+json'
             }
         });
+    }
+
+    async function paginateGraphQLQuery(query, itemsObjectGetterFn) {
+        if (query.indexOf("$endCursor") == -1) throw new Error("Query must specify $endCursor variable")
+        if (query.indexOf("pageInfo") == -1) throw new Error("Query must get the pageInfo data")
+
+
+        let endCursor = ""
+        let hasNextPage = true
+        const items = []
+        while (hasNextPage) {
+            const data = await callGraphQL({ query, endCursor })
+            const currentItems = itemsObjectGetterFn(data)
+            items.push(currentItems.nodes)
+            endCursor = currentItems.pageInfo.endCursor
+            hasNextPage = currentItems.pageInfo.hasNextPage
+        }
+        return items
     }
 }
