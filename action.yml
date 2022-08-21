@@ -18,7 +18,7 @@ inputs:
     description: 'Name of a TEXT field that stores the scheduled date.'
     required: false
     default: 'Schedule'
-outputs: []
+outputs:
 runs:
   using: "composite"
   steps:
