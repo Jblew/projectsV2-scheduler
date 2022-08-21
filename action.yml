@@ -5,6 +5,10 @@ inputs:
     description: 'Github Personal AccessToken (PAT) with full project scope.'
     required: false
 
+  project:
+    description: 'Project URL. For user projects use "users/{username}/projects/{number}"
+      and for orgs use "orgs/{name}/projects/{number}".'
+
   schedule-state-name:
     description: 'Schedule state name. Project V2 needs to have '
     required: false
@@ -18,4 +22,9 @@ outputs: []
 runs:
   using: "composite"
   steps:
-    - run: 
+    - uses: actions/github-script@v5
+      with:
+        github-token: ${{ inputs.token }}
+        script: |
+          const script = require('./action.js')
+          await script({github, context, core})
