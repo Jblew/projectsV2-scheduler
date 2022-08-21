@@ -41,5 +41,5 @@ runs:
       with:
         github-token: ${{ inputs.token }}
         script: |
-          const script = require('./action.js')
+          const script = require('action.js')
           await script({github, context, core})
