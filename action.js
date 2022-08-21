@@ -83,6 +83,7 @@ module.exports = async ({
         }
         `
         const data = callGraphQL({ query })
+        console.log(data)
         const statusFieldID = data.node.statusField.id
         const scheduleFieldID = data.node.scheduleField.id
         const scheduleFieldOptions = data.node.scheduleField.options
