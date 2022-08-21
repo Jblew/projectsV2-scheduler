@@ -1,6 +1,18 @@
 module.exports = async ({ github, context, core }) => {
     const { project, scheduleStateName, scheduleFieldName } = getInputs()
     const projectNodeID = await getProjectNodeID(project)
+    const { statusFieldID, scheduleFieldID, scheduleFieldOptions } = await getFieldIDs({
+        projectNodeID, scheduleFieldName
+    })
+    const scheduleOptionID = getFieldOptionID(scheduleFieldOptions, scheduleStateName)
+    const todoStateName = "todo"
+    const todoOptionID = getFieldOptionID(scheduleFieldOptions, todoStateName)
+    console.log('Found params', {
+        statusFieldID,
+        scheduleFieldID,
+        scheduleOptionID,
+        todoOptionID
+    })
 
     function getInputs() {
         const project = core.getInput('project')
@@ -25,7 +37,6 @@ module.exports = async ({ github, context, core }) => {
     }
 
     async function getOrgProjectNodeID({ name, number }) {
-        const { name, number } = options
         const query = `
         query FindOrgProjectNodeID {
             organization(login: "${name}") {
@@ -33,14 +44,12 @@ module.exports = async ({ github, context, core }) => {
                     id
                 }
             }
-        }
-        `
-        const data = await callGraphQL(query)
+        }`
+        const data = await callGraphQL({ query })
         return data.organization.projectV2.id
     }
 
     async function getUserProjectNodeID({ name, number }) {
-        const { name, number } = options
         const query = `
         query FindUserProjectNodeID {
             user(login: "${name}") {
@@ -48,10 +57,51 @@ module.exports = async ({ github, context, core }) => {
                     id
                 }
             }
-        }
-        `
+        }`
         const data = await callGraphQL({ query })
         return data.user.projectV2.id
+    }
+
+    async function getFieldIDs({ projectNodeID, scheduleFieldName }) {
+        const statusFieldName = "Status"
+        const query = `
+        query FindFieldIDs {
+            node(id: "${projectNodeID}") {
+                ... on ProjectV2 {
+                    statusField: field(name: "${statusFieldName}") {
+                        ... on ProjectV2SingleSelectField {
+                            id
+                            options {
+                                id
+                                name
+                                nameHTML
+                            }
+                        }
+                    }
+                    scheduleField: field(name: "${scheduleFieldName}") {
+                        ... on ProjectV2Field {
+                            id
+                            name
+                            dataType
+                        }
+                    }
+                }
+            }
+        }
+        `
+        const data = callGraphQL({ query })
+        const statusFieldID = data.node.statusField.id
+        const scheduleFieldID = data.node.scheduleField.id
+        const scheduleFieldOptions = data.node.scheduleField.options
+        return { statusFieldID, scheduleFieldID, scheduleFieldOptions }
+    }
+
+    function getFieldOptionID(name, options) {
+        const foundOptions = options.filter(option => option.name.toLowerCase() === name.toLowerCase())
+        if (foundOptions.length === 0) {
+            throw new Error(`So such field option: ${name}. Available options are: ${options.map(o => o.name.join(", "))}`)
+        }
+        return foundOptions[0].id
     }
 
     async function callGraphQL(opts) {
