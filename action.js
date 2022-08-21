@@ -10,9 +10,15 @@ module.exports = async ({
     const todoOptionID = getFieldOptionID(statusFieldOptions, todoStateName)
     const items = await getProjectItems({ projectNodeID, scheduleFieldName, statusFieldName })
     const { itemsToDeschedule, errors } = filterItems({ items, scheduleStateName })
-    console.log("TO DESCHEDULE:", itemsToDeschedule)
-    console.log("ERRORS:", errors)
+    for (const itemToDeschedule of itemsToDeschedule) {
+        const itemID = itemToDeschedule.id
+        await descheduleItem({ projectNodeID, itemID, statusFieldID, todoOptionID })
+            .catch(error => errors.push(`${error}`))
+    }
 
+    if (errors.length > 0) {
+        throw new Error(`There were errors while scheduling: \n - ${errors.join('\n- ')}\n`)
+    }
 
     async function getProjectNodeID(url) {
         const match = /^.*(?<type>orgs|users)\/(?<name>[^\/]+)\/projects\/(?<number>[0-9]+).*$/gm
@@ -166,6 +172,31 @@ module.exports = async ({
         if (datemillis < Date.now()) {
             return { deschedule: true }
         }
+    }
+
+    async function descheduleItem({ projectNodeID, itemID, statusFieldID, todoOptionID }) {
+        const query = `
+        mutation DescheduleItem {
+            updateProjectV2ItemFieldValue(
+                input: {
+                    clientMutationId: "${(new Date()).getTime()}${Math.random()}"
+                    projectId: "${projectNodeID}"
+                    itemId: "${itemID}"
+                    fieldId: "${statusFieldID}"
+                    value: {
+                        singleSelectOptionId: "${todoOptionID}"
+                    }
+                }
+            ) {
+                projectV2Item {
+                    id
+                }
+            }
+        }
+        `
+        callGraphQL({
+            query
+        })
     }
 
     async function callGraphQL(opts) {
