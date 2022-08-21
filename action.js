@@ -15,16 +15,11 @@ module.exports = async ({ github, context, core }) => {
     core.setOutput('de-scheduled-count', `${0}`);
 
     function getInputs() {
-        const project = core.getInput('project')
-        if (!project) throw new Error(`Missing input 'project'`)
-        const statusFieldName = core.getInput('status-field-name')
-        if (!statusFieldName) throw new Error(`Missing input 'status-field-name'`)
-        const scheduleFieldName = core.getInput('schedule-field-name')
-        if (!scheduleFieldName) throw new Error(`Missing input 'schedule-field-name'`)
-        const scheduleStateName = core.getInput('schedule-state-name')
-        if (!scheduleStateName) throw new Error(`Missing input 'schedule-state-name'`)
-        const todoStateName = core.getInput('todo-state-name')
-        if (!todoStateName) throw new Error(`Missing input 'todo-state-name'`)
+        const project = core.getInput('project', { required: true })
+        const statusFieldName = core.getInput('status-field-name', { required: true })
+        const scheduleFieldName = core.getInput('schedule-field-name', { required: true })
+        const scheduleStateName = core.getInput('schedule-state-name', { required: true })
+        const todoStateName = core.getInput('todo-state-name', { required: true })
         return { project, scheduleFieldName, statusFieldName, scheduleStateName, todoStateName }
     }
 

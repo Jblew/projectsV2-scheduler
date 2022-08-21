@@ -3,12 +3,13 @@ description: Schedules items in Projects V2 based on Schedule field.
 inputs:
   token:
     description: Github Personal AccessToken (PAT) with full project scope.
-    required: false
+    required: true
 
   project:
     description: |-
       Project URL. For user projects use "users/{username}/projects/{number}"
       and for orgs use "orgs/{name}/projects/{number}".
+    required: true
 
   schedule-field-name:
     description: Name of a TEXT field that stores the scheduled date.
