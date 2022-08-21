@@ -37,9 +37,11 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - run: echo "${{ github.action_path }}" >> $GITHUB_PATH
+      shell: bash  
     - uses: actions/github-script@v5
       with:
         github-token: ${{ inputs.token }}
         script: |
-          const script = require('action.js')
+          const script = require('./action.js')
           await script({github, context, core})
