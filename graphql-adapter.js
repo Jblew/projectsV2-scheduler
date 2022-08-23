@@ -8,7 +8,7 @@ class GraphQLAdapter {
     }
 
     mutation(mutation) {
-        return this._call({ mutation })
+        return this._call({ query: mutation })
     }
 
     async paginateQuery(query, itemsObjectGetterFn) {
