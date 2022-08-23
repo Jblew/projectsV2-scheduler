@@ -1,12 +1,11 @@
+const { GraphQLAdapter } = require("./graphql-adapter")
+
 module.exports = async ({
     github,
     project, statusFieldName, scheduleFieldName, scheduleStateName, todoStateName,
 }) => {
-    const projectNodeID = await getProjectNodeID(project)
-    const { statusFieldID, scheduleFieldID, statusFieldOptions } = await getFieldIDs({
-        projectNodeID, scheduleFieldName, statusFieldName
-    })
-    const scheduleOptionID = getFieldOptionID(statusFieldOptions, scheduleStateName)
+    const graphql = new GraphQLAdapter({ github })
+    const { projectNodeID, statusFieldID, statusFieldOptions } = await getProjectV2({ url: project, statusFieldName, scheduleFieldName })
     const todoOptionID = getFieldOptionID(statusFieldOptions, todoStateName)
     const items = await getProjectItems({ projectNodeID, scheduleFieldName, statusFieldName })
     const { itemsToDeschedule, errors } = filterItems({ items, scheduleStateName })
@@ -20,75 +19,70 @@ module.exports = async ({
         throw new Error(`There were errors while scheduling: \n - ${errors.join('\n- ')}\n`)
     }
 
-    async function getProjectNodeID(url) {
+    async function getProjectV2({ url, statusFieldName, scheduleFieldName }) {
+        const { ownerType, ownerLogin, projectNumber } = parseProjectURL(url)
+        const data = await graphql.query(`
+            query GetProjectV2Data {
+                ${ownerType}(login: "${ownerLogin}") {
+                    projectV2(number: ${projectNumber}) {
+                        id
+                        statusField: field(name: "${statusFieldName}") {
+                            ... on ProjectV2Field {
+                                id
+                                dataType
+                            }
+                            ... on ProjectV2SingleSelectField {
+                                id
+                                dataType
+                                options {
+                                    id
+                                    name
+                                    nameHTML
+                                }
+                            }
+                        }
+                        scheduleField: field(name: "${scheduleFieldName}") {
+                            ... on ProjectV2Field {
+                                id
+                                dataType
+                            }
+                        }
+                    }
+                }
+            }
+        `)
+        const projectV2 = data[ownerType].projectV2
+        if (!projectV2.statusField) {
+            throw new Error(`Project does not have a status field named "${statusFieldName}"`)
+        }
+        if (!projectV2.scheduleField) {
+            throw new Error(`Project does not have a schedule field named "${scheduleField}"`)
+        }
+        if (projectV2.statusField.dataType !== "SINGLE_SELECT") {
+            throw new Error(`Type of status field named "${statusFieldName}" is not SINGLE_SELECT`)
+        }
+        if (projectV2.scheduleField.dataType !== "DATE") {
+            throw new Error(`Type of status field named "${statusFieldName}" is not DATE`)
+        }
+        const projectNodeID = projectV2.id
+        const statusFieldID = projectV2.statusField.id
+        const scheduleFieldID = projectV2.scheduleField.id
+        const statusFieldOptions = projectV2.statusField.options
+        return { projectNodeID, statusFieldID, scheduleFieldID, statusFieldOptions }
+    }
+
+    function parseProjectURL(url) {
         const match = /^.*(?<type>orgs|users)\/(?<name>[^\/]+)\/projects\/(?<number>[0-9]+).*$/gm
             .exec(url.trim())
         if (!match || !match.groups || !match.groups.type || !match.groups.name || !match.groups.number) {
             throw new Error('Malformed project url')
         }
         const { type, name, number } = match.groups
-        return type === "orgs" ?
-            await getOrgProjectNodeID({ name, number })
-            : await getUserProjectNodeID({ name, number })
-    }
-
-    async function getOrgProjectNodeID({ name, number }) {
-        const query = `
-        query FindOrgProjectNodeID {
-            organization(login: "${name}") {
-                projectV2(number: ${number}) {
-                    id
-                }
-            }
-        }`
-        const data = await callGraphQL({ query })
-        return data.organization.projectV2.id
-    }
-
-    async function getUserProjectNodeID({ name, number }) {
-        const query = `
-        query FindUserProjectNodeID {
-            user(login: "${name}") {
-                projectV2(number: ${number}) {
-                    id
-                }
-            }
-        }`
-        const data = await callGraphQL({ query })
-        return data.user.projectV2.id
-    }
-
-    async function getFieldIDs({ projectNodeID, scheduleFieldName, statusFieldName }) {
-        const query = `
-        query FindFieldIDs {
-            node(id: "${projectNodeID}") {
-                ... on ProjectV2 {
-                    statusField: field(name: "${statusFieldName}") {
-                        ... on ProjectV2SingleSelectField {
-                            id
-                            options {
-                                id
-                                name
-                                nameHTML
-                            }
-                        }
-                    }
-                    scheduleField: field(name: "${scheduleFieldName}") {
-                        ... on ProjectV2Field {
-                            id
-                            name
-                            dataType
-                        }
-                    }
-                }
-            }
+        return {
+            ownerType: type === "orgs" ? "organization" : "user",
+            ownerLogin: name,
+            projectNumber: number
         }
-        `
-        const data = await callGraphQL({ query })
-        const statusFieldID = data.node.statusField.id
-        const scheduleFieldID = data.node.scheduleField.id
-        const statusFieldOptions = data.node.statusField.options
-        return { statusFieldID, scheduleFieldID, statusFieldOptions }
     }
 
     function getFieldOptionID(options, name) {
@@ -120,8 +114,8 @@ module.exports = async ({
                                     }
                                 }
                                 schedule: fieldValueByName(name: "${scheduleFieldName}") {
-                                    ... on ProjectV2ItemFieldTextValue {
-                                        text
+                                    ... on ProjectV2ItemFieldDateValue {
+                                        date
                                     }
                                 }
                                 status: fieldValueByName(name: "${statusFieldName}") {
@@ -140,7 +134,7 @@ module.exports = async ({
             }
         }
         `
-        return paginateGraphQLQuery(query, (data) => data.node.items)
+        return graphql.paginateQuery(query, (data) => data.node.items)
     }
 
     function filterItems({ items, scheduleStateName }) {
@@ -161,10 +155,10 @@ module.exports = async ({
 
     function shouldDescheduleItem(item) {
         const title = item.content.title
-        if (!item.schedule || !item.schedule.text) {
+        if (!item.schedule || !item.schedule.date) {
             return { error: `Item ${title} does not have a schedule field` }
         }
-        const scheduleValue = item.schedule.text
+        const scheduleValue = item.schedule.date
         const datemillis = Date.parse(scheduleValue)
         if (typeof datemillis !== "number") {
             return { error: `Item ${title} has invalid schedule field value: ${scheduleValue}` }
@@ -172,10 +166,11 @@ module.exports = async ({
         if (datemillis < Date.now()) {
             return { deschedule: true }
         }
+        return { deschedule: false }
     }
 
     async function descheduleItem({ projectNodeID, itemID, statusFieldID, todoOptionID }) {
-        const query = `
+        await graphql.mutation(`
         mutation DescheduleItem {
             updateProjectV2ItemFieldValue(
                 input: {
@@ -193,36 +188,6 @@ module.exports = async ({
                 }
             }
         }
-        `
-        callGraphQL({
-            query
-        })
-    }
-
-    async function callGraphQL(opts) {
-        return github.graphql({
-            ...opts,
-            headers: {
-                accept: 'application/vnd.github.v3.raw+json'
-            }
-        });
-    }
-
-    async function paginateGraphQLQuery(query, itemsObjectGetterFn) {
-        if (query.indexOf("$endCursor") == -1) throw new Error("Query must specify $endCursor variable")
-        if (query.indexOf("pageInfo") == -1) throw new Error("Query must get the pageInfo data")
-
-
-        let endCursor = ""
-        let hasNextPage = true
-        const items = []
-        while (hasNextPage) {
-            const data = await callGraphQL({ query, endCursor })
-            const currentItems = itemsObjectGetterFn(data)
-            items.push(...currentItems.nodes)
-            endCursor = currentItems.pageInfo.endCursor
-            hasNextPage = currentItems.pageInfo.hasNextPage
-        }
-        return items
+        `)
     }
 }
