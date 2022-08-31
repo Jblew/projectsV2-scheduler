@@ -50,7 +50,8 @@ runs:
           const script = require(`${process.env.ACTION_PATH}/action.js`)
           await script({
             github, context, core,
-            project: process.env.PROJECT,
+            log: core.info,
+            projectURL: process.env.PROJECT,
             scheduleFieldName: process.env.SCHEDULE_FIELD_NAME,
             statusFieldName: process.env.STATUS_FIELD_NAME,
             scheduleStateName: process.env.SCHEDULE_STATE_NAME,

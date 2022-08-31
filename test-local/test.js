@@ -10,7 +10,8 @@ console.log(script)
 
 script({
     github: octokit,
-    project: process.env.PROJECT,
+    log: console.log,
+    projectURL: process.env.PROJECT_URL,
     scheduleFieldName: process.env.SCHEDULE_FIELD_NAME,
     statusFieldName: process.env.STATUS_FIELD_NAME,
     scheduleStateName: process.env.SCHEDULE_STATE_NAME,
