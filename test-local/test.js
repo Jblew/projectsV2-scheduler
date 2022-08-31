@@ -1,5 +1,5 @@
 import { Octokit } from "@octokit/rest";
-import script from "../action.js"
+import script from "../src/action.js"
 import * as dotenv from 'dotenv'
 dotenv.config()
 
