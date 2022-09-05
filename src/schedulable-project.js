@@ -36,15 +36,18 @@ class SchedulableProject {
                         nodes {
                             id
                             ... on ProjectV2Item {
+                                type
                                 content {
                                     ... on DraftIssue {
                                         title
                                     }
                                     ... on Issue {
                                         title
+                                        id
                                     }
                                     ... on PullRequest {
                                         title
+                                        id
                                     }
                                 }
                                 schedule: fieldValueByName(name: "${this.scheduleFieldName}") {
@@ -72,24 +75,11 @@ class SchedulableProject {
     }
 
     async deschedule(item) {
-        const itemID = item.id
-        const todoOptionID = this._getFieldOptionID(this.todoStateName)
+        const isCommentable = ["ISSUE", "PULL_REQUEST"].includes(item.type)
         await this.graphql.mutation(`
         mutation DescheduleItem {
-            updateProjectV2ItemFieldValue(
-                input: {
-                    projectId: "${this.projectNodeID}"
-                    itemId: "${itemID}"
-                    fieldId: "${this.statusFieldID}"
-                    value: {
-                        singleSelectOptionId: "${todoOptionID}"
-                    }
-                }
-            ) {
-                projectV2Item {
-                    id
-                }
-            }
+            ${this._makeDescheduleMutation(item)}
+            ${isCommentable ? this._makeCommentMutation({ id: item.content.id, body: "Descheduled" }) : ''}
         }
         `)
     }
@@ -110,8 +100,44 @@ class SchedulableProject {
     _parseScheduledItem(item) {
         return {
             ...item,
-            date: item.schedule?.date ? new Date(item.schedule?.date) : new Date(NaN)
+            date: item.schedule?.date ? new Date(item.schedule?.date) : new Date(NaN),
         }
+    }
+
+    _makeDescheduleMutation(item) {
+        const itemID = item.id
+        const todoOptionID = this._getFieldOptionID(this.todoStateName)
+        return `
+        updateProjectV2ItemFieldValue(
+            input: {
+                projectId: "${this.projectNodeID}"
+                itemId: "${itemID}"
+                fieldId: "${this.statusFieldID}"
+                value: {
+                    singleSelectOptionId: "${todoOptionID}"
+                }
+            }
+        ) {
+            projectV2Item {
+                id
+            }
+        }
+        `
+    }
+
+    _makeCommentMutation({ id, body }) {
+        return `
+        addComment(
+            input: {
+                subjectId: "${id}"
+                body: "${body}"
+            }
+        ) {
+            subject {
+                id
+            }
+        }
+        `
     }
 }
 
